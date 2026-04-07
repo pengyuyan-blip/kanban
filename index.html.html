@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日动作看板</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #f0f2f5;
+  --surface:   #ffffff;
+  --surface2:  #f7f8fa;
+  --border:    #e8eaef;
+  --border2:   #d4d8e2;
+  --text:      #141620;
+  --sub:       #4f556b;
+  --muted:     #9199b0;
+  --faint:     #f0f2f7;
+
+  --c投放: #d94f4f;
+  --c运营: #6c5fcf;
+  --cBD:   #c07d10;
+  --c社媒: #b84d7a;
+  --c增长: #1c9c6e;
+
+  --done:  #1c9c6e;
+  --doing: #c07d10;
+  --todo:  #3a7bd5;
+  --block: #d94f4f;
+
+  --r: 16px;
+  --sh: 0 1px 4px rgba(0,0,0,.05), 0 6px 20px rgba(0,0,0,.06);
+  --sh2: 0 2px 8px rgba(0,0,0,.06), 0 16px 48px rgba(0,0,0,.1);
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:'Sora','Noto Sans SC',sans-serif;
+  background:var(--bg); color:var(--text);
+  min-height:100vh; -webkit-font-smoothing:antialiased;
+}
+
+/* ══ HEADER ══ */
+.hdr{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  height:62px; padding:0 36px;
+  display:flex; align-items:center; gap:18px;
+  position:sticky; top:0; z-index:90;
+}
+.hdr-logo{
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.hdr-mark{
+  width:32px; height:32px; border-radius:9px;
+  background:var(--text);
+  display:flex; align-items:center; justify-content:center;
+}
+.hdr-mark svg{ width:16px; height:16px; }
+.hdr-title{ font-size:15px; font-weight:700; letter-spacing:-.02em; }
+.hdr-sep{ width:1px; height:22px; background:var(--border); flex-shrink:0; }
+.hdr-date{
+  font-family:'DM Mono',monospace; font-size:12px; color:var(--muted);
+}
+.hdr-right{
+  margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.hchip{
+  display:flex; align-items:center; gap:5px;
+  background:var(--faint); border:1px solid var(--border);
+  border-radius:7px; padding:4px 11px;
+  font-size:12px; font-weight:500; color:var(--sub);
+}
+.hchip strong{ color:var(--text); }
+.hchip-dot{ width:6px; height:6px; border-radius:50%; }
+
+.btn-new{
+  display:flex; align-items:center; gap:6px;
+  background:var(--text); color:#fff; border:none;
+  border-radius:9px; padding:7px 15px;
+  font-size:12.5px; font-weight:600; cursor:pointer;
+  font-family:'Sora','Noto Sans SC',sans-serif;
+  transition:opacity .18s,transform .14s;
+}
+.btn-new:hover{ opacity:.82; transform:translateY(-1px); }
+
+/* ══ SUMMARY ROW ══ */
+.summary{
+  padding:24px 36px 0;
+  display:grid; grid-template-columns:repeat(5,1fr); gap:12px;
+}
+.scard{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r); padding:16px 18px;
+  box-shadow:var(--sh); cursor:pointer;
+  transition:box-shadow .2s,transform .18s,border-color .18s;
+  position:relative; overflow:hidden;
+}
+.scard-accent{
+  position:absolute; top:0; left:0; right:0; height:3px;
+  border-radius:16px 16px 0 0;
+}
+.scard:hover{ box-shadow:var(--sh2); transform:translateY(-2px); }
+.scard.active{ border-color:var(--role-color); box-shadow:0 0 0 3px color-mix(in srgb,var(--role-color) 14%,transparent); }
+
+.scard-top{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.scard-emoji{ font-size:18px; }
+.scard-pct{
+  font-family:'DM Mono',monospace; font-size:11px; font-weight:500;
+  border-radius:5px; padding:2px 7px;
+  background:var(--faint); color:var(--muted);
+}
+.scard.active .scard-pct{ background:color-mix(in srgb,var(--role-color) 12%,transparent); color:var(--role-color); }
+.scard-name{ font-size:15px; font-weight:700; letter-spacing:-.02em; margin-bottom:2px; }
+.scard-members{ font-size:11.5px; color:var(--muted); margin-bottom:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.scard-bar{ height:3px; background:var(--faint); border-radius:99px; overflow:hidden; margin-bottom:8px; }
+.scard-bar-fill{ height:100%; border-radius:99px; transition:width .6s cubic-bezier(.4,0,.2,1); }
+.scard-stats{ display:flex; gap:10px; }
+.scard-stat{ display:flex; align-items:center; gap:3px; font-size:11px; color:var(--muted); }
+.ss-dot{ width:5px; height:5px; border-radius:50%; }
+
+/* ══ TOOLBAR ══ */
+.toolbar{
+  padding:20px 36px 0;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.flbl{ font-size:12px; font-weight:500; color:var(--muted); }
+.fbtn{
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--sub); border-radius:7px;
+  padding:5px 13px; font-size:12.5px; font-weight:500;
+  cursor:pointer; transition:all .14s;
+  font-family:'Sora','Noto Sans SC',sans-serif;
+}
+.fbtn:hover{ border-color:var(--border2); color:var(--text); }
+.fbtn.active{ background:var(--text); border-color:var(--text); color:#fff; }
+.search-wrap{ margin-left:auto; position:relative; }
+.search-ico{
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  color:var(--muted); font-size:13px; pointer-events:none;
+}
+.search{
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text); border-radius:8px;
+  padding:6px 12px 6px 30px; font-size:12.5px; width:200px;
+  font-family:'Sora','Noto Sans SC',sans-serif; outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+.search:focus{ border-color:var(--border2); box-shadow:0 0 0 3px rgba(20,22,32,.07); }
+.search::placeholder{ color:var(--muted); }
+
+/* ══ BOARD ══ */
+.board{ padding:20px 36px 52px; }
+
+/* role group */
+.role-group{ margin-bottom:28px; }
+.role-group-head{
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:14px; cursor:pointer; user-select:none;
+}
+.rg-stripe{
+  width:4px; height:20px; border-radius:3px; flex-shrink:0;
+}
+.rg-title{ font-size:13px; font-weight:700; letter-spacing:.01em; }
+.rg-count{
+  font-size:11.5px; color:var(--muted);
+  background:var(--faint); border:1px solid var(--border);
+  border-radius:5px; padding:1px 7px;
+}
+.rg-line{ flex:1; height:1px; background:var(--border); }
+.rg-chevron{ font-size:10px; color:var(--muted); transition:transform .25s; }
+.role-group.collapsed .rg-chevron{ transform:rotate(-90deg); }
+
+.cards-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:14px;
+  overflow:hidden; max-height:2000px;
+  transition:max-height .36s cubic-bezier(.4,0,.2,1);
+}
+.role-group.collapsed .cards-grid{ max-height:0; }
+
+/* ══ PERSON CARD ══ */
+.pcard{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r); box-shadow:var(--sh);
+  overflow:hidden;
+  animation:cardIn .28s ease both;
+}
+@keyframes cardIn{ from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.pcard:hover{ box-shadow:var(--sh2); }
+
+.pcard-head{
+  display:flex; align-items:center; gap:10px;
+  padding:14px 16px 12px;
+  border-bottom:1px solid var(--border);
+}
+.pcard-av{
+  width:36px; height:36px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:700; flex-shrink:0;
+}
+.pcard-info{ flex:1; min-width:0; }
+.pcard-name{ font-size:14px; font-weight:700; }
+.pcard-role{ font-size:11.5px; color:var(--muted); }
+.pcard-done{
+  font-family:'DM Mono',monospace; font-size:11.5px;
+  font-weight:500; color:var(--muted);
+  background:var(--faint); border:1px solid var(--border);
+  border-radius:6px; padding:3px 8px; white-space:nowrap;
+}
+
+/* task items */
+.task-list{ padding:6px 0; }
+.task-item{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 16px;
+  border-bottom:1px solid var(--border);
+  transition:background .13s;
+}
+.task-item:last-of-type{ border-bottom:none; }
+.task-item:hover{ background:var(--faint); }
+.task-item.is-done .t-name{ text-decoration:line-through; color:var(--muted); }
+
+.t-cb{ accent-color:var(--text); cursor:pointer; flex-shrink:0; }
+.t-name{ font-size:13px; font-weight:500; flex:1; line-height:1.4; }
+
+.badge{
+  display:inline-flex; align-items:center; gap:4px;
+  border-radius:5px; padding:2px 8px;
+  font-size:11px; font-weight:600; white-space:nowrap; flex-shrink:0;
+}
+.bdot{ width:4px; height:4px; border-radius:50%; }
+.b-done { background:#eaf7f2; color:#1c9c6e; } .b-done  .bdot{ background:#1c9c6e; }
+.b-doing{ background:#fef4e4; color:#c07d10; } .b-doing .bdot{ background:#c07d10; }
+.b-todo { background:#eef3fd; color:#3a7bd5; } .b-todo  .bdot{ background:#3a7bd5; }
+.b-block{ background:#fef0f0; color:#d94f4f; } .b-block .bdot{ background:#d94f4f; }
+
+.t-acts{ display:flex; gap:4px; opacity:0; transition:opacity .13s; flex-shrink:0; }
+.task-item:hover .t-acts{ opacity:1; }
+.abtn{
+  border:1px solid var(--border); background:var(--surface);
+  color:var(--muted); border-radius:5px; padding:2px 8px;
+  font-size:11px; cursor:pointer; transition:all .13s;
+  font-family:'Sora','Noto Sans SC',sans-serif;
+}
+.abtn:hover{ border-color:var(--text); color:var(--text); }
+.abtn.del:hover{ border-color:var(--block); color:var(--block); }
+
+/* card footer */
+.pcard-footer{
+  border-top:1px dashed var(--border);
+  padding:8px 14px;
+}
+.btn-addtask{
+  display:flex; align-items:center; gap:6px;
+  background:none; border:none;
+  color:var(--muted); font-size:12px; cursor:pointer;
+  transition:color .13s; width:100%; text-align:left;
+  font-family:'Sora','Noto Sans SC',sans-serif;
+  padding:2px 0;
+}
+.btn-addtask:hover{ color:var(--text); }
+
+.empty-card{
+  text-align:center; padding:20px 16px;
+  color:var(--muted); font-size:12.5px;
+}
+
+/* ══ MODAL ══ */
+.overlay{
+  display:none; position:fixed; inset:0;
+  background:rgba(10,12,20,.32);
+  backdrop-filter:blur(6px);
+  z-index:200; align-items:center; justify-content:center;
+}
+.overlay.open{ display:flex; }
+.modal{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; width:480px; max-width:96vw;
+  padding:28px; box-shadow:var(--sh2);
+  animation:mUp .26s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes mUp{ from{transform:scale(.93)translateY(14px);opacity:0} to{transform:scale(1)translateY(0);opacity:1} }
+.m-title{
+  font-size:16px; font-weight:700; letter-spacing:-.02em;
+  margin-bottom:22px; display:flex; align-items:center; gap:9px;
+}
+.fg{ margin-bottom:13px; }
+.fg label{
+  display:block; font-size:10.5px;
+  font-family:'DM Mono',monospace; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:5px;
+}
+.fg input,.fg select,.fg textarea{
+  width:100%; background:var(--surface2); border:1px solid var(--border);
+  color:var(--text); border-radius:9px; padding:9px 12px;
+  font-size:13.5px; font-family:'Sora','Noto Sans SC',sans-serif;
+  outline:none; transition:border-color .18s,box-shadow .18s; resize:none;
+}
+.fg input:focus,.fg select:focus,.fg textarea:focus{
+  border-color:var(--text); box-shadow:0 0 0 3px rgba(20,22,32,.08);
+}
+.fg select option{ background:var(--surface); }
+.fg-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.m-footer{
+  display:flex; justify-content:flex-end; gap:10px;
+  margin-top:22px; padding-top:18px; border-top:1px solid var(--border);
+}
+.btn-cancel{
+  background:var(--faint); border:1px solid var(--border); color:var(--sub);
+  border-radius:9px; padding:9px 18px; font-size:13px; cursor:pointer;
+  font-family:'Sora','Noto Sans SC',sans-serif; transition:background .13s;
+}
+.btn-cancel:hover{ background:var(--border); }
+.btn-save{
+  background:var(--text); color:#fff; border:none;
+  border-radius:9px; padding:9px 20px; font-size:13px;
+  font-weight:600; cursor:pointer;
+  font-family:'Sora','Noto Sans SC',sans-serif;
+  transition:opacity .16s,transform .12s;
+}
+.btn-save:hover{ opacity:.85; transform:translateY(-1px); }
+
+@media(max-width:960px){ .summary{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:620px){
+  .hdr,.summary,.toolbar,.board{ padding-left:14px; padding-right:14px; }
+  .summary{ grid-template-columns:repeat(2,1fr); }
+  .search{ width:140px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-mark">
+      <svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="1" width="6" height="6" rx="1.2"/>
+        <rect x="9" y="1" width="6" height="6" rx="1.2"/>
+        <rect x="1" y="9" width="6" height="6" rx="1.2"/>
+        <rect x="9" y="9" width="6" height="6" rx="1.2"/>
+      </svg>
+    </div>
+    <span class="hdr-title">每日动作看板</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-date" id="hdate"></span>
+  <div class="hdr-right">
+    <div class="hchip"><span class="hchip-dot" style="background:var(--done)"></span>完成&nbsp;<strong id="s-done">0</strong></div>
+    <div class="hchip"><span class="hchip-dot" style="background:var(--doing)"></span>进行中&nbsp;<strong id="s-doing">0</strong></div>
+    <div class="hchip"><span class="hchip-dot" style="background:var(--block)"></span>阻塞&nbsp;<strong id="s-block">0</strong></div>
+    <button class="btn-new" onclick="openAdd()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="6" y1="1" x2="6" y2="11" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="6" x2="11" y2="6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      新增任务
+    </button>
+  </div>
+</header>
+
+<!-- SUMMARY CARDS -->
+<div class="summary" id="summary"></div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <span class="flbl">筛选</span>
+  <button class="fbtn active" onclick="setFilter('all',this)">全部</button>
+  <button class="fbtn" onclick="setFilter('投放',this)">投放</button>
+  <button class="fbtn" onclick="setFilter('运营',this)">运营</button>
+  <button class="fbtn" onclick="setFilter('BD',this)">BD</button>
+  <button class="fbtn" onclick="setFilter('社媒',this)">社媒</button>
+  <button class="fbtn" onclick="setFilter('增长',this)">增长</button>
+  <div class="search-wrap">
+    <span class="search-ico">⌕</span>
+    <input class="search" placeholder="搜索任务或成员…" oninput="doSearch(this.value)">
+  </div>
+</div>
+
+<!-- BOARD -->
+<div class="board" id="board"></div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="m-title">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="1.5" y="1.5" width="15" height="15" rx="3"/><line x1="9" y1="5.5" x2="9" y2="12.5"/><line x1="5.5" y1="9" x2="12.5" y2="9"/></svg>
+      新增 / 编辑任务
+    </div>
+    <div class="fg-row">
+      <div class="fg">
+        <label>岗位</label>
+        <select id="f-role" onchange="refreshPersons()">
+          <option>投放</option><option>运营</option>
+          <option>BD</option><option>社媒</option><option>增长</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>负责人</label>
+        <select id="f-person"></select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>任务名称</label>
+      <input id="f-name" placeholder="今天要完成什么？">
+    </div>
+    <div class="fg">
+      <label>状态</label>
+      <select id="f-status">
+        <option value="todo">待处理</option>
+        <option value="doing">进行中</option>
+        <option value="done">已完成</option>
+        <option value="block">⚠ 阻塞</option>
+      </select>
+    </div>
+    <div class="m-footer">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveTask()">保存任务</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── DATA ── */
+const ROLES = [
+  { id:'投放', color:'#d94f4f', emoji:'📣', members:['毛晨林','周杰'] },
+  { id:'运营', color:'#6c5fcf', emoji:'⚙️', members:['葛圆领','姚佳慧'] },
+  { id:'BD',   color:'#c07d10', emoji:'🤝', members:['张彬彬'] },
+  { id:'社媒', color:'#b84d7a', emoji:'📱', members:['邸文'] },
+  { id:'增长', color:'#1c9c6e', emoji:'📈', members:['赵玄烨'] },
+];
+
+let tasks = [
+  // 投放 · Meta
+  {id:1,  role:'投放', person:'毛晨林', name:'Meta · 检查昨日账户消耗与 ROAS 异常',      status:'done'},
+  {id:2,  role:'投放', person:'毛晨林', name:'Meta · 调整 Advantage+ 受众出价策略',      status:'doing'},
+  {id:3,  role:'投放', person:'毛晨林', name:'Meta · 新建本周 Retargeting 广告组',       status:'todo'},
+  {id:4,  role:'投放', person:'毛晨林', name:'Meta · 上传新一批 UGC 测试素材 ×6',        status:'todo'},
+  // 投放 · Google
+  {id:5,  role:'投放', person:'周杰',   name:'Google · 优化 Shopping 广告出价与分组',    status:'doing'},
+  {id:6,  role:'投放', person:'周杰',   name:'Google · 检查 Pmax 效果并排除低效词',      status:'done'},
+  {id:7,  role:'投放', person:'周杰',   name:'Google · A/B 测试新落地页 UTM 追踪配置',   status:'block'},
+  {id:8,  role:'投放', person:'周杰',   name:'Google · 撰写本周 Meta + GG 投放周报',     status:'todo'},
+
+  // 运营 · Shopify
+  {id:9,  role:'运营', person:'葛圆领', name:'Shopify · 更新首页 Banner 与促销文案',     status:'done'},
+  {id:10, role:'运营', person:'葛圆领', name:'Shopify · 配置本周 Discount Code 活动',    status:'doing'},
+  {id:11, role:'运营', person:'葛圆领', name:'Shopify · 排查废弃购物车并触发 EDM',       status:'todo'},
+  {id:12, role:'运营', person:'葛圆领', name:'Shopify · 回复 App Review 差评',           status:'todo'},
+  {id:13, role:'运营', person:'姚佳慧', name:'Shopify · 跟进物流异常订单 ×12 票',        status:'doing'},
+  {id:14, role:'运营', person:'姚佳慧', name:'Shopify · 优化产品详情页 SEO 描述',        status:'todo'},
+  {id:15, role:'运营', person:'姚佳慧', name:'Shopify · 核对本周退款 & Chargeback 单',   status:'done'},
+
+  // BD
+  {id:16, role:'BD',   person:'张彬彬', name:'跟进 KOL 合作报价与合同条款确认',          status:'doing'},
+  {id:17, role:'BD',   person:'张彬彬', name:'联系 3 家海外 Affiliate 平台洽谈入驻',     status:'todo'},
+  {id:18, role:'BD',   person:'张彬彬', name:'整理本月 Partnership pipeline 表',          status:'todo'},
+  {id:19, role:'BD',   person:'张彬彬', name:'向意向品牌方发送 Media Kit',               status:'done'},
+  {id:20, role:'BD',   person:'张彬彬', name:'跟进上周 Influencer 合作回复邮件',         status:'done'},
+
+  // 社媒 · Facebook / Instagram / YouTube
+  {id:21, role:'社媒', person:'邸文',   name:'Facebook · 发布今日帖子并设置 Boost',      status:'done'},
+  {id:22, role:'社媒', person:'邸文',   name:'Instagram · 发布 Reels + Stories ×2',      status:'doing'},
+  {id:23, role:'社媒', person:'邸文',   name:'Instagram · 回复粉丝评论与 DM',            status:'doing'},
+  {id:24, role:'社媒', person:'邸文',   name:'YouTube · 剪辑本周产品 Review 视频',       status:'todo'},
+  {id:25, role:'社媒', person:'邸文',   name:'YouTube · 优化视频 SEO 标题与描述',        status:'todo'},
+  {id:26, role:'社媒', person:'邸文',   name:'策划下周三平台内容日历',                   status:'todo'},
+
+  // 增长
+  {id:27, role:'增长', person:'赵玄烨', name:'分析本周 Meta + GG 归因数据漏斗',          status:'done'},
+  {id:28, role:'增长', person:'赵玄烨', name:'搭建 Shopify × GA4 转化追踪看板',          status:'doing'},
+  {id:29, role:'增长', person:'赵玄烨', name:'排查 Pixel 事件丢失问题',                  status:'block'},
+  {id:30, role:'增长', person:'赵玄烨', name:'输出本周全渠道增长周报',                   status:'todo'},
+  {id:31, role:'增长', person:'赵玄烨', name:'优化落地页加载速度（Core Web Vitals）',    status:'todo'},
+];
+
+let nid=500, editId=null, curFilter='all', curSearch='';
+
+/* ── BOOTSTRAP ── */
+function init(){
+  document.getElementById('hdate').textContent =
+    new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  refreshPersons();
+  render();
+}
+
+function filtered(){
+  return tasks.filter(t=>{
+    const mf = curFilter==='all'||t.role===curFilter;
+    const q  = curSearch.toLowerCase();
+    const ms = !q||[t.name,t.person].join(' ').toLowerCase().includes(q);
+    return mf&&ms;
+  });
+}
+
+/* ── RENDER ── */
+function render(){
+  const list = filtered();
+  document.getElementById('s-done').textContent  = list.filter(t=>t.status==='done').length;
+  document.getElementById('s-doing').textContent = list.filter(t=>t.status==='doing').length;
+  document.getElementById('s-block').textContent = list.filter(t=>t.status==='block').length;
+  renderSummary();
+  renderBoard(list);
+}
+
+function renderSummary(){
+  const el = document.getElementById('summary');
+  el.innerHTML='';
+  ROLES.forEach((role,i)=>{
+    const rt    = tasks.filter(t=>t.role===role.id);
+    const done  = rt.filter(t=>t.status==='done').length;
+    const doing = rt.filter(t=>t.status==='doing').length;
+    const block = rt.filter(t=>t.status==='block').length;
+    const todo  = rt.filter(t=>t.status==='todo').length;
+    const pct   = rt.length ? Math.round(done/rt.length*100) : 0;
+    const isActive = curFilter===role.id;
+
+    const d = document.createElement('div');
+    d.className = 'scard'+(isActive?' active':'');
+    d.style.setProperty('--role-color', role.color);
+    d.style.animationDelay = (i*30)+'ms';
+    d.innerHTML=`
+      <div class="scard-accent" style="background:${role.color}"></div>
+      <div class="scard-top">
+        <span class="scard-emoji">${role.emoji}</span>
+        <span class="scard-pct">${pct}%</span>
+      </div>
+      <div class="scard-name">${role.id}</div>
+      <div class="scard-members">${role.members.join(' · ')}</div>
+      <div class="scard-bar"><div class="scard-bar-fill" style="width:${pct}%;background:${role.color}"></div></div>
+      <div class="scard-stats">
+        <div class="scard-stat"><span class="ss-dot" style="background:var(--doing)"></span>${doing} 进行</div>
+        <div class="scard-stat"><span class="ss-dot" style="background:var(--block)"></span>${block} 阻塞</div>
+        <div class="scard-stat"><span class="ss-dot" style="background:var(--todo)"></span>${todo} 待办</div>
+      </div>
+    `;
+    d.onclick = ()=>{
+      const target = curFilter===role.id ? 'all' : role.id;
+      const btn = Array.from(document.querySelectorAll('.fbtn')).find(b=>b.textContent.trim()===(target==='all'?'全部':target));
+      setFilter(target, btn);
+    };
+    el.appendChild(d);
+  });
+}
+
+function renderBoard(list){
+  const el = document.getElementById('board');
+  el.innerHTML='';
+  ROLES.forEach((role,gi)=>{
+    const rt = list.filter(t=>t.role===role.id);
+    if(curFilter!=='all'&&rt.length===0) return;
+
+    const grp = document.createElement('div');
+    grp.className='role-group';
+    grp.style.animationDelay=(gi*40)+'ms';
+
+    // build person cards
+    let cardsHtml='';
+    role.members.forEach((person,pi)=>{
+      const pt    = rt.filter(t=>t.person===person);
+      const pdone = pt.filter(t=>t.status==='done').length;
+      const initial = person.replace(/^[小老]/,'')[0]||person[0];
+      cardsHtml+=`
+        <div class="pcard" style="animation-delay:${(gi*40+pi*30)}ms">
+          <div class="pcard-head">
+            <div class="pcard-av" style="background:${role.color}18;color:${role.color}">${initial}</div>
+            <div class="pcard-info">
+              <div class="pcard-name">${person}</div>
+              <div class="pcard-role">${role.id}</div>
+            </div>
+            <div class="pcard-done">${pdone}/${pt.length}</div>
+          </div>
+          <div class="task-list">
+            ${pt.length===0
+              ? `<div class="empty-card">暂无任务</div>`
+              : pt.map(t=>taskItem(t)).join('')}
+          </div>
+          <div class="pcard-footer">
+            <button class="btn-addtask" onclick="openAdd('${role.id}','${person}')">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><line x1="5.5" y1="1" x2="5.5" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="1" y1="5.5" x2="10" y2="5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              添加任务
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    grp.innerHTML=`
+      <div class="role-group-head" onclick="toggleGroup(this)">
+        <div class="rg-stripe" style="background:${role.color}"></div>
+        <span class="rg-title" style="color:${role.color}">${role.emoji} ${role.id}</span>
+        <span class="rg-count">${rt.length} 项任务</span>
+        <div class="rg-line"></div>
+        <span class="rg-chevron">▾</span>
+      </div>
+      <div class="cards-grid">${cardsHtml}</div>
+    `;
+    el.appendChild(grp);
+  });
+}
+
+function taskItem(t){
+  const sm={done:['b-done','已完成'],doing:['b-doing','进行中'],todo:['b-todo','待处理'],block:['b-block','阻塞']};
+  const [bc,bl]=sm[t.status]||sm.todo;
+  return `
+    <div class="task-item ${t.status==='done'?'is-done':''}" data-id="${t.id}">
+      <input class="t-cb" type="checkbox" ${t.status==='done'?'checked':''} onchange="toggleDone(${t.id})">
+      <span class="t-name">${t.name}</span>
+      <span class="badge ${bc}"><span class="bdot"></span>${bl}</span>
+      <div class="t-acts">
+        <button class="abtn" onclick="openEdit(${t.id})">编辑</button>
+        <button class="abtn del" onclick="del(${t.id})">删除</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ── INTERACTIONS ── */
+function toggleGroup(h){ h.parentElement.classList.toggle('collapsed'); }
+function toggleDone(id){
+  const t=tasks.find(x=>x.id===id);
+  if(t) t.status=t.status==='done'?'todo':'done';
+  render();
+}
+function del(id){ tasks=tasks.filter(x=>x.id!==id); render(); }
+function setFilter(cat,btn){
+  curFilter=cat;
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelector('.fbtn')?.classList.add('active');
+  render();
+}
+function doSearch(v){ curSearch=v; render(); }
+
+/* ── MODAL ── */
+function refreshPersons(roleId,selected){
+  const rid=roleId||document.getElementById('f-role').value;
+  const role=ROLES.find(r=>r.id===rid);
+  const sel=document.getElementById('f-person');
+  sel.innerHTML='';
+  (role?.members||[]).forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m; o.textContent=m;
+    if(m===selected) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+function openAdd(roleId,person){
+  editId=null;
+  const rid=roleId||'投放';
+  document.getElementById('f-role').value=rid;
+  refreshPersons(rid,person);
+  document.getElementById('f-name').value='';
+  document.getElementById('f-status').value='todo';
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),80);
+}
+function openEdit(id){
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  editId=id;
+  document.getElementById('f-role').value=t.role;
+  refreshPersons(t.role,t.person);
+  document.getElementById('f-name').value=t.name;
+  document.getElementById('f-status').value=t.status;
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+function saveTask(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){ alert('请填写任务名称'); return; }
+  const obj={
+    role:  document.getElementById('f-role').value,
+    person:document.getElementById('f-person').value,
+    name,
+    status:document.getElementById('f-status').value,
+  };
+  if(editId) Object.assign(tasks.find(x=>x.id===editId),obj);
+  else tasks.push({id:nid++,...obj});
+  closeModal(); render();
+}
+document.getElementById('overlay').addEventListener('click',e=>{
+  if(e.target===document.getElementById('overlay')) closeModal();
+});
+
+init();
+</script>
+</body>
+</html>
